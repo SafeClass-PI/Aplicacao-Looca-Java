@@ -1,0 +1,5 @@
+school/sptech/entity/connectBD/BDConnectionProvider.class
+school/sptech/Main.class
+school/sptech/entity/connectBD/H2ConnectionProvider.class
+school/sptech/repository/RedeRepository.class
+school/sptech/BancoDados.class
