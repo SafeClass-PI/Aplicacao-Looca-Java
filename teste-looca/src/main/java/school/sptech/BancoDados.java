@@ -6,9 +6,9 @@ import java.sql.SQLException;
 
 public class BancoDados {
 
-    private static final String URL = "jdbc:mysql://54.204.112.127:3306/safeclass?useSSL=false&serverTimezone=UTC";
-    private static final String USUARIO = "root";
-    private static final String SENHA = "urubu100";
+    private static final String URL = "jdbc:mysql://localhost:3306/safeclass?useSSL=false&serverTimezone=UTC";
+    private static final String USUARIO = "ryan"; // Mudar cada vez que utilizar
+    private static final String SENHA = "Urubu100";
 
     public Connection conectar() throws SQLException {
         try {

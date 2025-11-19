@@ -13,11 +13,13 @@ import school.sptech.BancoDados;
 public class RedeRepository {
 
     private final BancoDados bancoDados;
-    private int idComponenteRede;
+    private int idUpload;
+    private int idDownload;
 
     public RedeRepository() {
         this.bancoDados = new BancoDados();
-        this.idComponenteRede = 4; // ID fixo do componente de rede conforme o banco de dados
+        this.idUpload = 4; // ID fixo do componente de rede conforme o banco de dados
+        this.idDownload = 5; // ID fixo do componente de rede conforme o banco de dados
     }
 
     /**
@@ -29,11 +31,16 @@ public class RedeRepository {
      */
     public void salvarVelocidadeRede(double velocidadeDownloadMbps, double velocidadeUploadMbps) throws SQLException {
         try (Connection conexao = bancoDados.conectar()) {
-            String sql = "INSERT INTO captura (fkComponente, velocidadeDownload, velocidadeUpload) VALUES (?, ?, ?)";
+            String sql = "INSERT INTO captura (fkComponente, registro) VALUES (?, ?)";
             PreparedStatement ps = conexao.prepareStatement(sql);
-            ps.setInt(1, idComponenteRede);
+            ps.setInt(1, idUpload);
+            ps.setDouble(2, velocidadeUploadMbps);
+            ps.executeUpdate();
+
+            String sql1 = "INSERT INTO captura (fkComponente, registro) VALUES (?, ?)";
+            PreparedStatement ps1 = conexao.prepareStatement(sql);
+            ps.setInt(1, idDownload);
             ps.setDouble(2, velocidadeDownloadMbps);
-            ps.setDouble(3, velocidadeUploadMbps);
             ps.executeUpdate();
         }
     }
@@ -49,7 +56,7 @@ public class RedeRepository {
         Looca looca = new Looca();
         RedeRepository redeRepository = new RedeRepository();
 
-        System.out.println("Monitorando velocidade de rede (Download/Upload em Mbps) a cada 5 segundos...");
+        System.out.println("Monitorando velocidade de rede (Download/Upload em Mbps) a cada 2 segundos...");
         System.out.println("Pressione CTRL+C para parar.\n");
 
         // Filtra a primeira interface com algum tráfego (ativa)
@@ -71,8 +78,8 @@ public class RedeRepository {
         long tempoInicial = System.currentTimeMillis();
 
         while (true) {
-            // Aguarda 5 segundos para a próxima medição
-            Thread.sleep(5000);
+            // Aguarda 2 segundos para a próxima medição
+            Thread.sleep(1500);
 
             // Captura velocidades de rede
             double velocidadeDownloadMbps = obterVelocidadeDownload(rede, bytesRecebidosAnterior, tempoInicial);
