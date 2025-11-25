@@ -2,144 +2,119 @@ package school.sptech.repository;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
-import com.github.britooo.looca.api.core.Looca;
-import com.github.britooo.looca.api.group.rede.RedeInterface;
-import school.sptech.BancoDados;
+import school.sptech.bd.BancoDados;
 
-/**
- * Repositório responsável por salvar os dados de rede no banco de dados.
- */
 public class RedeRepository {
 
-    private final BancoDados bancoDados;
-    private int idUpload;
-    private int idDownload;
+    public final BancoDados bancoDados;
+    private final int componenteUpload = 4;
+    private final int componenteDownload = 5;
 
     public RedeRepository() {
         this.bancoDados = new BancoDados();
-        this.idUpload = 4; // ID fixo do componente de rede conforme o banco de dados
-        this.idDownload = 5; // ID fixo do componente de rede conforme o banco de dados
     }
 
-    /**
-     * Salva os dados de velocidade de download e upload no banco de dados.
-     *
-     * @param velocidadeDownloadMbps Velocidade de download em Mbps
-     * @param velocidadeUploadMbps   Velocidade de upload em Mbps
-     * @throws SQLException Se ocorrer um erro ao acessar o banco de dados
-     */
-    public void salvarVelocidadeRede(double velocidadeDownloadMbps, double velocidadeUploadMbps) throws SQLException {
-        try (Connection conexao = bancoDados.conectar()) {
-            String sql = "INSERT INTO captura (fkComponente, registro) VALUES (?, ?)";
-            PreparedStatement ps = conexao.prepareStatement(sql);
-            ps.setInt(1, idUpload);
-            ps.setDouble(2, velocidadeUploadMbps);
-            ps.executeUpdate();
-
-            String sql1 = "INSERT INTO captura (fkComponente, registro) VALUES (?, ?)";
-            PreparedStatement ps1 = conexao.prepareStatement(sql);
-            ps.setInt(1, idDownload);
-            ps.setDouble(2, velocidadeDownloadMbps);
-            ps.executeUpdate();
-        }
+    public int getComponenteUpload() {
+        return componenteUpload;
     }
 
-    /**
-     * Método main para executar o monitoramento de rede diretamente deste arquivo.
-     *
-     * @param args Argumentos da linha de comando (não utilizados)
-     * @throws InterruptedException Se o thread for interrompido durante o sleep
-     * @throws SQLException         Se ocorrer um erro ao acessar o banco de dados
-     */
-    public static void main(String[] args) throws InterruptedException, SQLException {
-        Looca looca = new Looca();
-        RedeRepository redeRepository = new RedeRepository();
+    public int getComponenteDownload() {
+        return componenteDownload;
+    }
 
-        System.out.println("Monitorando velocidade de rede (Download/Upload em Mbps) a cada 2 segundos...");
-        System.out.println("Pressione CTRL+C para parar.\n");
-
-        // Filtra a primeira interface com algum tráfego (ativa)
-        RedeInterface rede = looca.getRede().getGrupoDeInterfaces()
-                .getInterfaces()
-                .stream()
-                .filter(i -> i.getBytesRecebidos() > 0 || i.getBytesEnviados() > 0)
-                .findFirst()
-                .orElse(null);
-
-        if (rede == null) {
-            System.out.println("Nenhuma interface de rede ativa encontrada.");
-            return;
+    public String getNomeComponente(int idComponente) {
+        String sql = "SELECT nome FROM Componente WHERE idComponente = ?";
+        try (Connection conn = bancoDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, idComponente);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getString("nome");
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
+        return "Desconhecido";
+    }
 
-        // Inicializa variáveis para cálculo de velocidade
-        long bytesEnviadosAnterior = rede.getBytesEnviados();
-        long bytesRecebidosAnterior = rede.getBytesRecebidos();
-        long tempoInicial = System.currentTimeMillis();
-
-        while (true) {
-            // Aguarda 2 segundos para a próxima medição
-            Thread.sleep(1500);
-
-            // Captura velocidades de rede
-            double velocidadeDownloadMbps = obterVelocidadeDownload(rede, bytesRecebidosAnterior, tempoInicial);
-            double velocidadeUploadMbps = obterVelocidadeUpload(rede, bytesEnviadosAnterior, tempoInicial);
-
-            // Exibe as velocidades no console
-            System.out.printf("↓ Download: %.2f Mbps | ↑ Upload: %.2f Mbps%n",
-                    velocidadeDownloadMbps, velocidadeUploadMbps);
-
-            // Salva no banco usando o repositório
-            redeRepository.salvarVelocidadeRede(velocidadeDownloadMbps, velocidadeUploadMbps);
-
-            // Atualiza valores para próxima medição
-            bytesEnviadosAnterior = rede.getBytesEnviados();
-            bytesRecebidosAnterior = rede.getBytesRecebidos();
-            tempoInicial = System.currentTimeMillis();
+    // -----------------------------------------
+    // Ajuste: Captura não tem fkMaquina no banco
+    // -----------------------------------------
+    public void registrarLeitura(int idComponente, double valor) {
+        String sql = "INSERT INTO Captura (registro, fkComponente) VALUES (?, ?)";
+        try (Connection conn = bancoDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setDouble(1, valor);
+            stmt.setInt(2, idComponente);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            System.out.println("ERRO ao salvar captura.");
+            e.printStackTrace();
         }
     }
 
-    /**
-     * Obtém a velocidade de download atual em Mbps.
-     *
-     * @param rede                   Interface de rede para obter os dados
-     * @param bytesRecebidosAnterior Bytes recebidos na medição anterior
-     * @param tempoInicial           Tempo da medição anterior em milissegundos
-     * @return Velocidade de download em Mbps
-     */
-    private static double obterVelocidadeDownload(RedeInterface rede, long bytesRecebidosAnterior, long tempoInicial) {
-        long bytesRecebidosAtual = rede.getBytesRecebidos();
-        long tempoAtual = System.currentTimeMillis();
-        double segundosDecorridos = (tempoAtual - tempoInicial) / 1000.0;
-
-        // Evita divisão por zero
-        if (segundosDecorridos <= 0) {
-            return 0.0;
+    public double getUltimaCaptura(int idComponente) {
+        String sql = "SELECT registro FROM Captura WHERE fkComponente = ? ORDER BY idCaptura DESC LIMIT 1";
+        try (Connection conn = bancoDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, idComponente);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getDouble("registro");
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
-
-        long bytesRecebidosDelta = bytesRecebidosAtual - bytesRecebidosAnterior;
-        return (bytesRecebidosDelta * 8) / (segundosDecorridos * 1_000);
+        return 0.0;
     }
 
-    /**
-     * Obtém a velocidade de upload atual em Mbps.
-     *
-     * @param rede                  Interface de rede para obter os dados
-     * @param bytesEnviadosAnterior Bytes enviados na medição anterior
-     * @param tempoInicial          Tempo da medição anterior em milissegundos
-     * @return Velocidade de upload em Mbps
-     */
-    private static double obterVelocidadeUpload(RedeInterface rede, long bytesEnviadosAnterior, long tempoInicial) {
-        long bytesEnviadosAtual = rede.getBytesEnviados();
-        long tempoAtual = System.currentTimeMillis();
-        double segundosDecorridos = (tempoAtual - tempoInicial) / 1000.0;
+    public static class Parametro {
+        public double minimo;
+        public double maximo;
+        public String sala;
+        public int maquina;
+        public String ip;
+        public double capacidade;
+        public String sistemaOperacional;
+        public String canalSlack;
+    }
 
-        // Evita divisão por zero
-        if (segundosDecorridos <= 0) {
-            return 0.0;
+    public Parametro getParametroComponente(int idComponente) {
+        String sql = """
+            SELECT
+                p.minimo, p.maximo,
+                s.nome AS sala,
+                m.idMaquina AS maquina,
+                m.ip,
+                c.capacidade,
+                m.sistemaOperacional,
+                e.idSlack AS canalSlack
+            FROM Parametro p
+            JOIN Componente c ON p.fkComponente = c.idComponente
+            JOIN Maquina m ON c.fkMaquina = m.idMaquina
+            JOIN Sala s ON m.fkSala = s.idSala
+            JOIN Escola e ON s.fkEscola = e.idEscola
+            WHERE c.idComponente = ?
+        """;
+
+        Parametro p = new Parametro();
+
+        try (Connection conn = bancoDados.conectar();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, idComponente);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                p.minimo = rs.getDouble("minimo");
+                p.maximo = rs.getDouble("maximo");
+                p.sala = rs.getString("sala");
+                p.maquina = rs.getInt("maquina");
+                p.ip = rs.getString("ip");
+                p.capacidade = rs.getDouble("capacidade");
+                p.sistemaOperacional = rs.getString("sistemaOperacional");
+                p.canalSlack = rs.getString("canalSlack");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
 
-        long bytesEnviadosDelta = bytesEnviadosAtual - bytesEnviadosAnterior;
-        return (bytesEnviadosDelta * 8) / (segundosDecorridos * 1_000);
+        return p;
     }
 }

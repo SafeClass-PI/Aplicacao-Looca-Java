@@ -2,19 +2,34 @@ package school.sptech;
 
 import com.github.britooo.looca.api.core.Looca;
 import com.github.britooo.looca.api.group.rede.RedeInterface;
+import school.sptech.bd.BancoDados;
+import school.sptech.repository.SlackService;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class Main {
 
-    public static void main(String[] args) throws InterruptedException {
+    private static final int ID_COMPONENTE_UPLOAD = 9;
+    private static final int ID_COMPONENTE_DOWNLOAD = 10;
+
+    private static final String SLACK_TOKEN = (System.getenv("SlackToken"));
+    private static final String SLACK_CANAL = "#canal-teste-alerta";
+
+    public static void main(String[] args) throws InterruptedException, SQLException {
         Looca looca = new Looca();
+        BancoDados banco = new BancoDados();
+        SlackService slack = new SlackService(SLACK_TOKEN);
 
-        System.out.println("Monitorando tráfego de rede (MB) a cada 5 segundos...");
-        System.out.println("Pressione CTRL+C para parar.\n");
 
-        // Pega a primeira interface de rede ativa
+        slack.enviarAlerta(SLACK_CANAL, "✅ Captura de Upload e Download sem criticidades!");
+
         RedeInterface rede = looca.getRede().getGrupoDeInterfaces()
                 .getInterfaces()
                 .stream()
+                .filter(r -> r.getBytesEnviados() > 0 || r.getBytesRecebidos() > 0)
                 .findFirst()
                 .orElse(null);
 
@@ -26,22 +41,93 @@ public class Main {
         long bytesEnviadosAnterior = rede.getBytesEnviados();
         long bytesRecebidosAnterior = rede.getBytesRecebidos();
 
-        while (true) {
-            Thread.sleep(5000);
+        try (Connection conexao = banco.conectar()) {
+            long intervalo = 5000;
 
-            long bytesEnviadosAtual = rede.getBytesEnviados();
-            long bytesRecebidosAtual = rede.getBytesRecebidos();
+            while (true) {
+                Thread.sleep(intervalo);
 
-            long bytesEnviadosDelta = bytesEnviadosAtual - bytesEnviadosAnterior;
-            long bytesRecebidosDelta = bytesRecebidosAtual - bytesRecebidosAnterior;
+                long bytesEnviadosAtual = rede.getBytesEnviados();
+                long bytesRecebidosAtual = rede.getBytesRecebidos();
 
-            double mbEnviados = bytesEnviadosDelta / 1_000_000.0;
-            double mbRecebidos = bytesRecebidosDelta / 1_000_000.0;
+                double mbpsEnviados = ((bytesEnviadosAtual - bytesEnviadosAnterior) * 8.0) / 1_000_000 / (intervalo / 1000.0);
+                double mbpsRecebidos = ((bytesRecebidosAtual - bytesRecebidosAnterior) * 8.0) / 1_000_000 / (intervalo / 1000.0);
 
-            System.out.printf("Enviados: %.2f MB | Recebidos: %.2f MB%n", mbEnviados, mbRecebidos);
+                System.out.printf("Enviados: %.2f Mbps | Recebidos: %.2f Mbps%n", mbpsEnviados, mbpsRecebidos);
 
-            bytesEnviadosAnterior = bytesEnviadosAtual;
-            bytesRecebidosAnterior = bytesRecebidosAtual;
+                int idCapturaUpload = inserirCaptura(conexao, ID_COMPONENTE_UPLOAD, mbpsEnviados);
+                int idCapturaDownload = inserirCaptura(conexao, ID_COMPONENTE_DOWNLOAD, mbpsRecebidos);
+
+                verificarParametroEAlerta(conexao, ID_COMPONENTE_UPLOAD, mbpsEnviados, idCapturaUpload, slack);
+                verificarParametroEAlerta(conexao, ID_COMPONENTE_DOWNLOAD, mbpsRecebidos, idCapturaDownload, slack);
+
+                bytesEnviadosAnterior = bytesEnviadosAtual;
+                bytesRecebidosAnterior = bytesRecebidosAtual;
+            }
+        }
+    }
+
+    private static int inserirCaptura(Connection conexao, int fkComponente, double registro) {
+        String sql = "INSERT INTO Captura(fkComponente, registro) VALUES (?, ?)";
+        try (PreparedStatement stmt = conexao.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
+            stmt.setInt(1, fkComponente);
+            stmt.setDouble(2, registro);
+            stmt.executeUpdate();
+            ResultSet rs = stmt.getGeneratedKeys();
+            if (rs.next()) return rs.getInt(1);
+        } catch (SQLException e) {
+            System.err.println("Erro ao inserir captura: " + e.getMessage());
+        }
+        return -1;
+    }
+
+    private static void verificarParametroEAlerta(Connection conexao, int fkComponente, double registro, int fkCaptura, SlackService slack) {
+        String sql = "SELECT minimo, maximo, idParametro FROM Parametro WHERE fkComponente = ?";
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setInt(1, fkComponente);
+            ResultSet rs = stmt.executeQuery();
+
+            boolean dentroParametro = false;
+
+            while (rs.next()) {
+                double minimo = rs.getDouble("minimo");
+                double maximo = rs.getDouble("maximo");
+
+                if (registro >= minimo && registro <= maximo) {
+                    dentroParametro = true;
+                    break;
+                }
+            }
+
+            if (!dentroParametro) {
+                String mensagem = String.format("⚠ Componente %d fora do parâmetro: %.2f Mbps", fkComponente, registro);
+                inserirAlerta(conexao, fkCaptura, mensagem, rs);
+                System.out.println(mensagem);
+                slack.enviarAlerta(SLACK_CANAL, mensagem);
+            } else {
+                System.out.println("✅ Componente " + fkComponente + " dentro do parâmetro.");
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Erro ao verificar parâmetros: " + e.getMessage());
+        }
+    }
+
+    private static void inserirAlerta(Connection conexao, int fkCaptura, String mensagem, ResultSet rsParametro) {
+        try {
+            rsParametro.beforeFirst();
+            if (rsParametro.next()) {
+                int fkParametro = rsParametro.getInt("idParametro");
+                String sql = "INSERT INTO Alerta(fkParametro, fkCaptura, mensagem, enviado) VALUES (?, ?, ?, 0)";
+                try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+                    stmt.setInt(1, fkParametro);
+                    stmt.setInt(2, fkCaptura);
+                    stmt.setString(3, mensagem);
+                    stmt.executeUpdate();
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao inserir alerta: " + e.getMessage());
         }
     }
 }
