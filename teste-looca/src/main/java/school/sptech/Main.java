@@ -41,7 +41,7 @@ public class Main {
         long bytesRecebidosAnterior = rede.getBytesRecebidos();
 
         try (Connection conexao = banco.conectar()) {
-            long intervalo = 5000;
+            long intervalo = 20000;
 
             while (true) {
                 Thread.sleep(intervalo);
