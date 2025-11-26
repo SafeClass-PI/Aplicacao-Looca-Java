@@ -23,7 +23,6 @@ public class Main {
         BancoDados banco = new BancoDados();
         SlackService slack = new SlackService(SLACK_TOKEN);
 
-
         slack.enviarAlerta(SLACK_CANAL, "✅ Captura de Upload e Download sem criticidades!");
 
         RedeInterface rede = looca.getRede().getGrupoDeInterfaces()
@@ -88,6 +87,7 @@ public class Main {
             ResultSet rs = stmt.executeQuery();
 
             boolean dentroParametro = false;
+            int fkParametro = -1;
 
             while (rs.next()) {
                 double minimo = rs.getDouble("minimo");
@@ -96,12 +96,14 @@ public class Main {
                 if (registro >= minimo && registro <= maximo) {
                     dentroParametro = true;
                     break;
+                } else {
+                    fkParametro = rs.getInt("idParametro");
                 }
             }
 
-            if (!dentroParametro) {
+            if (!dentroParametro && fkParametro != -1) {
                 String mensagem = String.format("⚠ Componente %d fora do parâmetro: %.2f Mbps", fkComponente, registro);
-                inserirAlerta(conexao, fkCaptura, mensagem, rs);
+                inserirAlerta(conexao, fkCaptura, mensagem, fkParametro);
                 System.out.println(mensagem);
                 slack.enviarAlerta(SLACK_CANAL, mensagem);
             } else {
@@ -113,19 +115,13 @@ public class Main {
         }
     }
 
-    private static void inserirAlerta(Connection conexao, int fkCaptura, String mensagem, ResultSet rsParametro) {
-        try {
-            rsParametro.beforeFirst();
-            if (rsParametro.next()) {
-                int fkParametro = rsParametro.getInt("idParametro");
-                String sql = "INSERT INTO Alerta(fkParametro, fkCaptura, mensagem, enviado) VALUES (?, ?, ?, 0)";
-                try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-                    stmt.setInt(1, fkParametro);
-                    stmt.setInt(2, fkCaptura);
-                    stmt.setString(3, mensagem);
-                    stmt.executeUpdate();
-                }
-            }
+    private static void inserirAlerta(Connection conexao, int fkCaptura, String mensagem, int fkParametro) {
+        String sql = "INSERT INTO Alerta(fkParametro, fkCaptura, mensagem, enviado) VALUES (?, ?, ?, 0)";
+        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
+            stmt.setInt(1, fkParametro);
+            stmt.setInt(2, fkCaptura);
+            stmt.setString(3, mensagem);
+            stmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Erro ao inserir alerta: " + e.getMessage());
         }
