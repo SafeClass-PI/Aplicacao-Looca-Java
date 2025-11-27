@@ -49,8 +49,8 @@ public class Main {
                 long bytesEnviadosAtual = rede.getBytesEnviados();
                 long bytesRecebidosAtual = rede.getBytesRecebidos();
 
-                double mbpsEnviados = ((bytesEnviadosAtual - bytesEnviadosAnterior) * 8.0) / 1_000_000 / (intervalo / 1000.0);
-                double mbpsRecebidos = ((bytesRecebidosAtual - bytesRecebidosAnterior) * 8.0) / 1_000_000 / (intervalo / 1000.0);
+                double mbpsEnviados = ((bytesEnviadosAtual - bytesEnviadosAnterior) * 8.0) / 1_000_00 / (intervalo / 1000.0);
+                double mbpsRecebidos = ((bytesRecebidosAtual - bytesRecebidosAnterior) * 8.0) / 1_000_00 / (intervalo / 1000.0);
 
                 System.out.printf("Enviados: %.2f Mbps | Recebidos: %.2f Mbps%n", mbpsEnviados, mbpsRecebidos);
 
