@@ -12,8 +12,8 @@ import java.sql.SQLException;
 
 public class Main {
 
-    private static final int ID_COMPONENTE_UPLOAD = 9;
-    private static final int ID_COMPONENTE_DOWNLOAD = 10;
+    private static final int ID_COMPONENTE_UPLOAD = 4;
+    private static final int ID_COMPONENTE_DOWNLOAD = 5;
 
     private static final String SLACK_TOKEN = (System.getenv("SlackToken"));
     private static final String SLACK_CANAL = "#canal-teste-alerta";
@@ -41,7 +41,7 @@ public class Main {
         long bytesRecebidosAnterior = rede.getBytesRecebidos();
 
         try (Connection conexao = banco.conectar()) {
-            long intervalo = 20000;
+            long intervalo = 30000;
 
             while (true) {
                 Thread.sleep(intervalo);
@@ -102,28 +102,16 @@ public class Main {
             }
 
             if (!dentroParametro && fkParametro != -1) {
-                String mensagem = String.format("⚠ Componente %d fora do parâmetro: %.2f Mbps", fkComponente, registro);
-                inserirAlerta(conexao, fkCaptura, mensagem, fkParametro);
-                System.out.println(mensagem);
-                slack.enviarAlerta(SLACK_CANAL, mensagem);
+                String mensagemSlack = String.format("⚠ Uso componente %d a %.2f Mbps", fkComponente, registro);
+                String mensagem = String.format("Uso a %.2f Mbps", registro);
+                System.out.println(mensagemSlack);
+                slack.enviarAlerta(SLACK_CANAL, mensagemSlack);
             } else {
                 System.out.println("✅ Componente " + fkComponente + " dentro do parâmetro.");
             }
 
         } catch (SQLException e) {
             System.err.println("Erro ao verificar parâmetros: " + e.getMessage());
-        }
-    }
-
-    private static void inserirAlerta(Connection conexao, int fkCaptura, String mensagem, int fkParametro) {
-        String sql = "INSERT INTO Alerta(fkParametro, fkCaptura, mensagem, enviado) VALUES (?, ?, ?, 0)";
-        try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
-            stmt.setInt(1, fkParametro);
-            stmt.setInt(2, fkCaptura);
-            stmt.setString(3, mensagem);
-            stmt.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("Erro ao inserir alerta: " + e.getMessage());
         }
     }
 }
