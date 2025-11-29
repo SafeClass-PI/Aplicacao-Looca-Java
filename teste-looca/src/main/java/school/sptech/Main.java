@@ -67,7 +67,7 @@ public class Main {
     }
 
     private static int inserirCaptura(Connection conexao, int fkComponente, double registro) {
-        String sql = "INSERT INTO Captura(fkComponente, registro) VALUES (?, ?)";
+        String sql = "INSERT INTO captura(fkComponente, registro) VALUES (?, ?)";
         try (PreparedStatement stmt = conexao.prepareStatement(sql, PreparedStatement.RETURN_GENERATED_KEYS)) {
             stmt.setInt(1, fkComponente);
             stmt.setDouble(2, registro);
@@ -81,7 +81,7 @@ public class Main {
     }
 
     private static void verificarParametroEAlerta(Connection conexao, int fkComponente, double registro, int fkCaptura, SlackService slack) {
-        String sql = "SELECT minimo, maximo, idParametro FROM Parametro WHERE fkComponente = ?";
+        String sql = "SELECT minimo, maximo, idParametro FROM parametro WHERE fkComponente = ?";
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setInt(1, fkComponente);
             ResultSet rs = stmt.executeQuery();

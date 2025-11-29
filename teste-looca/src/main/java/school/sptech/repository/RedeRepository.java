@@ -25,7 +25,7 @@ public class RedeRepository {
     }
 
     public String getNomeComponente(int idComponente) {
-        String sql = "SELECT nome FROM Componente WHERE idComponente = ?";
+        String sql = "SELECT nome FROM componente WHERE idComponente = ?";
         try (Connection conn = bancoDados.conectar();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, idComponente);
@@ -41,7 +41,7 @@ public class RedeRepository {
     // Ajuste: Captura não tem fkMaquina no banco
     // -----------------------------------------
     public void registrarLeitura(int idComponente, double valor) {
-        String sql = "INSERT INTO Captura (registro, fkComponente) VALUES (?, ?)";
+        String sql = "INSERT INTO captura (registro, fkComponente) VALUES (?, ?)";
         try (Connection conn = bancoDados.conectar();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setDouble(1, valor);
@@ -54,7 +54,7 @@ public class RedeRepository {
     }
 
     public double getUltimaCaptura(int idComponente) {
-        String sql = "SELECT registro FROM Captura WHERE fkComponente = ? ORDER BY idCaptura DESC LIMIT 1";
+        String sql = "SELECT registro FROM captura WHERE fkComponente = ? ORDER BY idCaptura DESC LIMIT 1";
         try (Connection conn = bancoDados.conectar();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, idComponente);
@@ -87,11 +87,11 @@ public class RedeRepository {
                 c.capacidade,
                 m.sistemaOperacional,
                 e.idSlack AS canalSlack
-            FROM Parametro p
-            JOIN Componente c ON p.fkComponente = c.idComponente
-            JOIN Maquina m ON c.fkMaquina = m.idMaquina
-            JOIN Sala s ON m.fkSala = s.idSala
-            JOIN Escola e ON s.fkEscola = e.idEscola
+            FROM parametro p
+            JOIN componente c ON p.fkComponente = c.idComponente
+            JOIN maquina m ON c.fkMaquina = m.idMaquina
+            JOIN sala s ON m.fkSala = s.idSala
+            JOIN escola e ON s.fkEscola = e.idEscola
             WHERE c.idComponente = ?
         """;
 

@@ -8,7 +8,7 @@ public class BancoDados {
 
     private static final String URL = "jdbc:mysql://localhost:3306/safeclass";
     private static final String USUARIO = "root"; // Usuário do MySQL
-    private static final String SENHA = "SUA_SENHA"; // Senha do MySQL
+    private static final String SENHA = "urubu100"; // Senha do MySQL
 
     public Connection conectar() throws SQLException {
         return DriverManager.getConnection(URL, USUARIO, SENHA);
