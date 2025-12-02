@@ -3,7 +3,6 @@ package school.sptech;
 import com.github.britooo.looca.api.core.Looca;
 import com.github.britooo.looca.api.group.rede.RedeInterface;
 import school.sptech.bd.BancoDados;
-import school.sptech.repository.SlackService;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -21,9 +20,6 @@ public class Main {
     public static void main(String[] args) throws InterruptedException, SQLException {
         Looca looca = new Looca();
         BancoDados banco = new BancoDados();
-        SlackService slack = new SlackService(SLACK_TOKEN);
-
-        slack.enviarAlerta(SLACK_CANAL, "✅ Captura de Upload e Download sem criticidades!");
 
         RedeInterface rede = looca.getRede().getGrupoDeInterfaces()
                 .getInterfaces()
@@ -57,8 +53,8 @@ public class Main {
                 int idCapturaUpload = inserirCaptura(conexao, ID_COMPONENTE_UPLOAD, mbpsEnviados);
                 int idCapturaDownload = inserirCaptura(conexao, ID_COMPONENTE_DOWNLOAD, mbpsRecebidos);
 
-                verificarParametroEAlerta(conexao, ID_COMPONENTE_UPLOAD, mbpsEnviados, idCapturaUpload, slack);
-                verificarParametroEAlerta(conexao, ID_COMPONENTE_DOWNLOAD, mbpsRecebidos, idCapturaDownload, slack);
+                verificarParametroEAlerta(conexao, ID_COMPONENTE_UPLOAD, mbpsEnviados, idCapturaUpload);
+                verificarParametroEAlerta(conexao, ID_COMPONENTE_DOWNLOAD, mbpsRecebidos, idCapturaDownload);
 
                 bytesEnviadosAnterior = bytesEnviadosAtual;
                 bytesRecebidosAnterior = bytesRecebidosAtual;
@@ -80,7 +76,7 @@ public class Main {
         return -1;
     }
 
-    private static void verificarParametroEAlerta(Connection conexao, int fkComponente, double registro, int fkCaptura, SlackService slack) {
+    private static void verificarParametroEAlerta(Connection conexao, int fkComponente, double registro, int fkCaptura) {
         String sql = "SELECT minimo, maximo, idParametro FROM parametro WHERE fkComponente = ?";
         try (PreparedStatement stmt = conexao.prepareStatement(sql)) {
             stmt.setInt(1, fkComponente);
@@ -105,7 +101,6 @@ public class Main {
                 String mensagemSlack = String.format("⚠ Uso componente %d a %.2f Mbps", fkComponente, registro);
                 String mensagem = String.format("Uso a %.2f Mbps", registro);
                 System.out.println(mensagemSlack);
-                slack.enviarAlerta(SLACK_CANAL, mensagemSlack);
             } else {
                 System.out.println("✅ Componente " + fkComponente + " dentro do parâmetro.");
             }
